@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SMART Callback</title>
+</head>
+
+<body style="font-family: Arial; padding: 30px">
+
+<h2>Patient Data</h2>
+<pre id="out">Loading...</pre>
+
+<script>
+const CLIENT_ID = "smart_-sqZ0_QNOXt5WKmYqLDWEabG_oCbxIJt";
+const FHIR_BASE = "https://api.mock.health/fhir";
+
+const code = new URLSearchParams(window.location.search).get("code");
+const verifier = sessionStorage.getItem("pkce_verifier");
+
+// ---------------- token exchange ----------------
+async function getToken(config) {
+
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    client_id: CLIENT_ID,
+    redirect_uri: window.location.origin + "/callback.html",
+    code_verifier: verifier
+  });
+
+  const res = await fetch(config.token_endpoint, {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body
+  });
+
+  return res.json();
+}
+
+// ---------------- FHIR call ----------------
+async function getPatient(token) {
+  const res = await fetch(FHIR_BASE + "/Patient", {
+    headers: {
+      Authorization: "Bearer " + token
+    }
+  });
+
+  return res.json();
+}
+
+// ---------------- main ----------------
+(async function () {
+
+  const out = document.getElementById("out");
+
+  const config = await fetch(
+    FHIR_BASE + "/.well-known/smart-configuration"
+  ).then(r => r.json());
+
+  out.innerText = "Exchanging token...";
+
+  const token = await getToken(config);
+
+  out.innerText = "Loading patient...";
+
+  const bundle = await getPatient(token.access_token);
+
+  const patient = bundle.entry?.[0]?.resource;
+
+  out.innerText =
+    "Patient:\n" +
+    patient.name?.[0]?.given?.join(" ") +
+    " " +
+    patient.name?.[0]?.family;
+
+})();
+</script>
+
+</body>
+</html>
